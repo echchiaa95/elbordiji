@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0f172a" />
+<title>اطلب من طاولتك</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --accent:#34d399; --accent2:#f59e0b; --txt:#f1f5f9; --muted:#94a3b8; --danger:#f87171; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:"Segoe UI", Tahoma, Arial, sans-serif; background:var(--bg); color:var(--txt); min-height:100vh; }
+  [dir="ltr"] body, [dir="ltr"] .flip { direction:ltr; }
+  .wrap { max-width:520px; margin:0 auto; padding:0 14px 110px; }
+  header { position:sticky; top:0; z-index:20; background:rgba(15,23,42,.95); backdrop-filter:blur(8px); padding:14px; border-bottom:1px solid #334155; }
+  header h1 { font-size:18px; display:flex; align-items:center; gap:8px; }
+  header .tbl { color:var(--accent); }
+  .langs { display:flex; gap:6px; margin-top:8px; }
+  .langs button { background:#334155; color:var(--txt); border:0; border-radius:20px; padding:4px 14px; font-size:13px; cursor:pointer; }
+  .langs button.on { background:var(--accent); color:#052e1b; font-weight:700; }
+  .cats { display:flex; gap:8px; overflow-x:auto; padding:12px 0 4px; scrollbar-width:none; }
+  .cats::-webkit-scrollbar { display:none; }
+  .cats button { white-space:nowrap; background:var(--card); color:var(--txt); border:1px solid #334155; border-radius:20px; padding:8px 16px; font-size:14px; cursor:pointer; }
+  .cats button.on { background:var(--accent); color:#052e1b; border-color:var(--accent); font-weight:700; }
+  .item { display:flex; gap:12px; background:var(--card); border:1px solid #334155; border-radius:14px; padding:12px; margin-top:10px; }
+  .item img { width:72px; height:72px; border-radius:10px; object-fit:cover; background:#0b1220; flex-shrink:0; }
+  .item .ph { width:72px; height:72px; border-radius:10px; background:#0b1220; display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+  .item .inf { flex:1; min-width:0; }
+  .item b { font-size:15px; display:block; }
+  .item small { color:var(--muted); font-size:12px; display:block; margin-top:2px; line-height:1.4; }
+  .item .row2 { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+  .price { color:var(--accent); font-weight:800; font-size:15px; }
+  .qty { display:flex; align-items:center; gap:10px; }
+  .qty button { width:34px; height:34px; border-radius:10px; border:0; background:#334155; color:var(--txt); font-size:18px; cursor:pointer; }
+  .qty button.add { background:var(--accent); color:#052e1b; font-weight:800; }
+  .qty b { min-width:20px; text-align:center; }
+  .cartbar { position:fixed; bottom:0; left:0; right:0; z-index:30; background:#0b1220; border-top:1px solid #334155; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); }
+  .cartbar .in { max-width:520px; margin:0 auto; }
+  .cartbar button { width:100%; background:var(--accent); color:#052e1b; border:0; border-radius:14px; padding:15px; font-size:17px; font-weight:800; cursor:pointer; }
+  .cartbar button:disabled { opacity:.5; }
+  .sheet { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; }
+  .sheet .box { background:var(--bg); width:100%; max-width:520px; margin:0 auto; border-radius:20px 20px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); max-height:85vh; overflow-y:auto; }
+  .sheet h2 { font-size:17px; margin-bottom:12px; }
+  .crow { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #334155; }
+  .crow .nm { flex:1; min-width:0; }
+  .crow small { color:var(--muted); display:block; }
+  input[type=text], textarea { width:100%; background:var(--card); border:1px solid #334155; border-radius:10px; color:var(--txt); padding:12px; font-size:15px; font-family:inherit; margin-top:10px; }
+  .tot { display:flex; justify-content:space-between; font-size:18px; font-weight:800; padding:14px 0; }
+  .tot span:last-child { color:var(--accent); }
+  .btn2 { width:100%; border-radius:14px; padding:14px; font-size:16px; font-weight:700; border:0; cursor:pointer; margin-top:8px; }
+  .btn2.pri { background:var(--accent); color:#052e1b; }
+  .btn2.sec { background:#334155; color:var(--txt); }
+  .center { text-align:center; padding:60px 20px; color:var(--muted); }
+  .center .big { font-size:52px; display:block; margin-bottom:14px; }
+  .stline { display:flex; justify-content:center; gap:6px; margin:18px 0; flex-wrap:wrap; }
+  .stline span { background:#334155; border-radius:20px; padding:6px 12px; font-size:12px; color:var(--muted); }
+  .stline span.done { background:var(--accent); color:#052e1b; font-weight:700; }
+  .stline span.cur { background:var(--accent2); color:#451a03; font-weight:700; }
+  .note { color:var(--muted); font-size:12px; text-align:center; margin-top:14px; line-height:1.6; }
+  .spin { width:42px; height:42px; border:4px solid #334155; border-top-color:var(--accent); border-radius:50%; margin:0 auto 16px; animation:sp 1s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍽️ <span id="hTitle">…</span> <span class="tbl" id="hTable"></span></h1>
+  <div class="langs">
+    <button type="button" data-lang="ar" class="on">عربية</button>
+    <button type="button" data-lang="fr">Français</button>
+    <button type="button" data-lang="en">English</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="vLoad" class="center"><div class="spin"></div><p id="loadMsg">…</p></div>
+  <div id="vErr" class="center hidden"><span class="big">⚠️</span><p id="errMsg"></p></div>
+
+  <div id="vMenu" class="hidden">
+    <div class="cats" id="cats"></div>
+    <div id="items"></div>
+  </div>
+
+  <div id="vStatus" class="hidden">
+    <div class="center" style="padding:30px 10px 0;">
+      <span class="big" id="stEmoji">✅</span>
+      <h2 id="stTitle"></h2>
+      <p id="stSub" style="margin-top:6px;"></p>
+      <p id="stRef" class="note" style="margin-top:2px;" dir="ltr"></p>
+    </div>
+    <div class="stline" id="stLine"></div>
+    <div id="stItems"></div>
+    <div class="tot"><span id="stTotL"></span><span id="stTotV"></span></div>
+    <button class="btn2 pri" id="stNew"></button>
+    <p class="note" id="stNote"></p>
+  </div>
+</div>
+
+<div class="cartbar hidden" id="cartBar"><div class="in"><button type="button" id="cartBtn"></button></div></div>
+
+<div class="sheet hidden" id="sheet">
+  <div class="box">
+    <h2 id="shTitle"></h2>
+    <div id="shItems"></div>
+    <textarea id="shNotes" rows="2" maxlength="500"></textarea>
+    <div class="tot"><span id="shTotL"></span><span id="shTotV"></span></div>
+    <button class="btn2 pri" id="shSend"></button>
+    <button class="btn2 sec" id="shBack"></button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   صفحة زبون المطعم — طلب QR من الطاولة (Phase 7A)
+   - مفتاح anon/publishable فقط — لا يوجد أي مفتاح سري هنا إطلاقًا.
+   - كل القراءة/الكتابة عبر دوال RPC آمنة (SECURITY DEFINER) في الخادم.
+   - الأسعار تُعرض من الخادم ويُعاد حسابها في الخادم عند الإرسال.
+   ===================================================================== */
+const SUPABASE_URL = "https://lcijdjihkzenabhnlhxl.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1k9usfmeGl3-n1amoH9eIw_zT01B00r";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+const I18N = {
+  ar: { dir:"rtl", loading:"جارٍ التحميل…", badToken:"رمز QR غير صالح أو لم يعد مفعلًا. اطلب المساعدة من النادل.", netErr:"تعذّر الاتصال. تحقق من الإنترنت وأعد المحاولة.",
+        all:"الكل", table:"طاولة", cart:(n,t)=>`🛒 السلة (${n}) — ${t}`, yourOrder:"طلبك", notes:"ملاحظات للمطبخ (اختياري)…", total:"الإجمالي", send:"إرسال الطلب 🚀", back:"متابعة التصفح",
+        sentT:"تم استلام طلبك!", sentS:"طلبك الآن لدى المطعم. يمكنك متابعة حالته هنا.", newOrder:"طلب جديد +",
+        stNote:"الدفع يتم في المطعم عند إنهاء طلبك. لا يُخصم أي مبلغ من هاتفك.",
+        steps:{PLACED:"طلبك وصل",CONFIRMED:"تم تأكيد الطلب",PREPARING:"قيد التحضير",READY:"الطلب جاهز 🔔",COMPLETED:"تم التسليم ✅",CANCELLED:"ملغى"},
+        empty:"لا توجد أصناف متاحة حاليًا.", addFail:"تعذّر إرسال الطلب. حاول مجددًا.", cancelled:"أُلغي هذا الطلب." },
+  fr: { dir:"ltr", loading:"Chargement…", badToken:"QR code invalide ou désactivé. Demandez au serveur.", netErr:"Connexion impossible. Vérifiez Internet et réessayez.",
+        all:"Tout", table:"Table", cart:(n,t)=>`🛒 Panier (${n}) — ${t}`, yourOrder:"Votre commande", notes:"Notes pour la cuisine (optionnel)…", total:"Total", send:"Envoyer 🚀", back:"Continuer",
+        sentT:"Commande reçue !", sentS:"Le restaurant a votre commande. Suivez son statut ici.", newOrder:"Nouvelle commande +",
+        stNote:"Le paiement se fait au restaurant. Rien n'est débité de votre téléphone.",
+        steps:{PLACED:"Commande reçue",CONFIRMED:"Confirmée",PREPARING:"En préparation",READY:"Prête 🔔",COMPLETED:"Livrée ✅",CANCELLED:"Annulée"},
+        empty:"Aucun article disponible.", addFail:"Envoi impossible. Réessayez.", cancelled:"Commande annulée." },
+  en: { dir:"ltr", loading:"Loading…", badToken:"Invalid or revoked QR code. Please ask the staff.", netErr:"Connection failed. Check Internet and retry.",
+        all:"All", table:"Table", cart:(n,t)=>`🛒 Cart (${n}) — ${t}`, yourOrder:"Your order", notes:"Notes for the kitchen (optional)…", total:"Total", send:"Send order 🚀", back:"Keep browsing",
+        sentT:"Order received!", sentS:"The restaurant has your order. Track it here.", newOrder:"New order +",
+        stNote:"Payment is made at the restaurant. Nothing is charged to your phone.",
+        steps:{PLACED:"Order received",CONFIRMED:"Confirmed",PREPARING:"Preparing",READY:"Ready 🔔",COMPLETED:"Delivered ✅",CANCELLED:"Cancelled"},
+        empty:"No items available right now.", addFail:"Could not send the order. Try again.", cancelled:"This order was cancelled." },
+};
+let lang = localStorage.getItem("qr_lang") || "ar";
+const T = () => I18N[lang] || I18N.ar;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const money = (n, cur) => (Number(n) || 0).toFixed(2).replace(/\.00$/, "") + " " + (cur || state.currency || "MAD");
+
+const state = { token:"", store:null, table:null, menu:[], cat:"", cart:{}, currency:"MAD", orderToken:"", poll:null };
+
+/* ---------- التهيئة ---------- */
+function applyLang() {
+  const t = T();
+  document.documentElement.lang = lang;
+  document.documentElement.dir = t.dir;
+  document.querySelectorAll(".langs button").forEach((b) => b.classList.toggle("on", b.dataset.lang === lang));
+  $("loadMsg").textContent = t.loading;
+  renderAll();
+}
+document.querySelectorAll(".langs button").forEach((b) => b.addEventListener("click", () => { lang = b.dataset.lang; localStorage.setItem("qr_lang", lang); applyLang(); }));
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const a = new Uint8Array(16); crypto.getRandomValues(a);
+  a[6] = (a[6] & 15) | 64; a[8] = (a[8] & 63) | 128;
+  return [...a].map((b, i) => ([4,6,8,10].includes(i) ? "-" : "") + b.toString(16).padStart(2, "0")).join("");
+}
+
+async function init() {
+  applyLang();
+  state.token = new URLSearchParams(location.search).get("t") || "";
+  if (!state.token) return showErr(T().badToken);
+  // استئناف طلب سابق على هذه الطاولة (إن وُجد)
+  try {
+    const saved = JSON.parse(localStorage.getItem("qr_cart_" + state.token) || "{}");
+    state.cart = saved.cart || {};
+    state.orderToken = saved.orderToken || "";
+  } catch (e) { /* تجاهل */ }
+  try {
+    const { data, error } = await sb.rpc("resolve_restaurant_table_by_token", { p_token: state.token });
+    if (error) throw error;
+    if (!data || !data.length) return showErr(T().badToken);
+    state.table = data[0];
+    const m = await sb.rpc("get_qr_menu", { p_token: state.token });
+    if (m.error) throw m.error;
+    state.menu = m.data || [];
+    if (state.orderToken) { showStatus(); return; }
+    showMenu();
+  } catch (e) {
+    showErr(T().netErr);
+  }
+}
+function persist() {
+  try { localStorage.setItem("qr_cart_" + state.token, JSON.stringify({ cart: state.cart, orderToken: state.orderToken })); } catch (e) {}
+}
+function showErr(msg) { $("vLoad").classList.add("hidden"); $("vErr").classList.remove("hidden"); $("errMsg").textContent = msg; }
+function showMenu() {
+  $("vLoad").classList.add("hidden"); $("vErr").classList.add("hidden"); $("vStatus").classList.add("hidden");
+  $("vMenu").classList.remove("hidden"); $("cartBar").classList.remove("hidden");
+  renderAll();
+}
+
+/* ---------- العرض ---------- */
+function cartCount() { return Object.values(state.cart).reduce((s, c) => s + c.qty, 0); }
+function cartTotal() { return Object.values(state.cart).reduce((s, c) => { const m = state.menu.find((x) => x.product_id === c.id); return s + (m ? Number(m.price) * c.qty : 0); }, 0); }
+
+function renderAll() {
+  const t = T();
+  if (state.table) { $("hTitle").textContent = t.table; $("hTable").textContent = state.table.table_name || ("#" + state.table.table_number); }
+  renderCats(); renderItems(); renderCartBar();
+}
+function renderCats() {
+  const cats = [...new Set(state.menu.map((m) => m.category).filter(Boolean))];
+  $("cats").innerHTML = '<button type="button" data-c="" class="' + (!state.cat ? "on" : "") + '">' + esc(T().all) + "</button>" +
+    cats.map((c) => '<button type="button" data-c="' + esc(c) + '" class="' + (state.cat === c ? "on" : "") + '">' + esc(c) + "</button>").join("");
+  $("cats").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { state.cat = b.dataset.c; renderCats(); renderItems(); }));
+}
+function renderItems() {
+  const list = state.menu.filter((m) => !state.cat || m.category === state.cat);
+  if (!list.length) { $("items").innerHTML = '<div class="center">' + esc(T().empty) + "</div>"; return; }
+  $("items").innerHTML = list.map((m) => {
+    const c = state.cart[m.product_id];
+    return '<div class="item">' +
+      (m.image_url ? '<img src="' + esc(m.image_url) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=&quot;ph&quot;>🍽️</div>\'" />' : '<div class="ph">🍽️</div>') +
+      '<div class="inf"><b>' + esc(m.name) + "</b>" + (m.description ? "<small>" + esc(m.description) + "</small>" : "") +
+      '<div class="row2"><span class="price">' + esc(money(m.price)) + '</span><span class="qty">' +
+      (c ? '<button type="button" data-a="dec" data-id="' + esc(m.product_id) + '">−</button><b>' + c.qty + "</b>" : "") +
+      '<button type="button" class="add" data-a="inc" data-id="' + esc(m.product_id) + '">+</button></span></div></div></div>';
+  }).join("");
+  $("items").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const id = b.dataset.id;
+    if (b.dataset.a === "inc") state.cart[id] = { id, qty: Math.min(99, (state.cart[id] ? state.cart[id].qty : 0) + 1) };
+    else { state.cart[id].qty--; if (state.cart[id].qty <= 0) delete state.cart[id]; }
+    persist(); renderItems(); renderCartBar();
+  }));
+}
+function renderCartBar() {
+  const n = cartCount();
+  $("cartBar").classList.toggle("hidden", !n || !$("vStatus").classList.contains("hidden") === false && false);
+  if ($("vMenu").classList.contains("hidden")) return;
+  $("cartBar").classList.toggle("hidden", n === 0);
+  $("cartBtn").textContent = T().cart(n, money(cartTotal()));
+  $("cartBtn").disabled = !n;
+}
+$("cartBtn").addEventListener("click", openSheet);
+function openSheet() {
+  const t = T();
+  $("shTitle").textContent = t.yourOrder;
+  $("shNotes").placeholder = t.notes;
+  $("shTotL").textContent = t.total; $("shTotV").textContent = money(cartTotal());
+  $("shSend").textContent = t.send; $("shBack").textContent = t.back;
+  $("shItems").innerHTML = Object.values(state.cart).map((c) => {
+    const m = state.menu.find((x) => x.product_id === c.id);
+    if (!m) return "";
+    return '<div class="crow"><div class="nm"><b>' + esc(m.name) + "</b><small>" + esc(money(m.price)) + " × " + c.qty + "</small></div>" +
+      '<span class="qty"><button type="button" data-a="dec" data-id="' + esc(c.id) + '">−</button><b>' + c.qty + '</b><button type="button" class="add" data-a="inc" data-id="' + esc(c.id) + '">+</button></span></div>';
+  }).join("");
+  $("shItems").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const id = b.dataset.id;
+    if (b.dataset.a === "inc") state.cart[id].qty = Math.min(99, state.cart[id].qty + 1);
+    else { state.cart[id].qty--; if (state.cart[id].qty <= 0) delete state.cart[id]; }
+    persist();
+    if (!cartCount()) { closeSheet(); } else { openSheet(); renderItems(); renderCartBar(); }
+  }));
+  $("sheet").classList.remove("hidden");
+}
+function closeSheet() { $("sheet").classList.add("hidden"); renderItems(); renderCartBar(); }
+$("shBack").addEventListener("click", closeSheet);
+
+/* ---------- الإرسال ---------- */
+$("shSend").addEventListener("click", async () => {
+  const btn = $("shSend");
+  if (btn.disabled) return; // حماية من الضغط المزدوج
+  btn.disabled = true;
+  const t = T();
+  try {
+    let ref = localStorage.getItem("qr_ref_" + state.token);
+    if (!ref || !cartCount()) { ref = uuid(); }
+    localStorage.setItem("qr_ref_" + state.token, ref);
+    const items = Object.values(state.cart).map((c) => ({ product_id: c.id, quantity: c.qty }));
+    const { data, error } = await sb.rpc("create_qr_order", {
+      p_token: state.token, p_client_ref: ref, p_items: items, p_notes: $("shNotes").value || "",
+    });
+    if (error) throw error;
+    if (!data || !data.ok) {
+      if (data && data.error === "invalid_token") { showErr(t.badToken); return; }
+      alert(t.addFail); return;
+    }
+    state.orderToken = data.order_token;
+    state.cart = {}; localStorage.removeItem("qr_ref_" + state.token);
+    persist();
+    closeSheet();
+    showStatus(data);
+  } catch (e) {
+    alert(t.addFail);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------- حالة الطلب ---------- */
+const STATUS_ORDER = ["PLACED", "CONFIRMED", "PREPARING", "READY", "COMPLETED"];
+function showStatus(data) {
+  const t = T();
+  $("vLoad").classList.add("hidden"); $("vMenu").classList.add("hidden"); $("cartBar").classList.add("hidden");
+  $("vStatus").classList.remove("hidden");
+  if (state.table) { $("hTitle").textContent = t.table; $("hTable").textContent = state.table.table_name || ("#" + state.table.table_number); }
+  renderStatus(data || null);
+  startPolling();
+}
+function renderStatus(d) {
+  const t = T();
+  const st = d ? d.status : "PLACED";
+  const cancelled = st === "CANCELLED";
+  $("stEmoji").textContent = cancelled ? "❌" : st === "READY" ? "🔔" : st === "COMPLETED" ? "✅" : "✅";
+  $("stTitle").textContent = cancelled ? t.cancelled : t.sentT;
+  $("stSub").textContent = cancelled ? "" : t.sentS;
+  $("stLine").innerHTML = STATUS_ORDER.map((s) => {
+    const idx = STATUS_ORDER.indexOf(st), i = STATUS_ORDER.indexOf(s);
+    return '<span class="' + (cancelled ? "" : i < idx ? "done" : i === idx ? "cur" : "") + '">' + esc(t.steps[s]) + "</span>";
+  }).join("");
+  if (d && d.items) {
+    $("stItems").innerHTML = d.items.map((i) =>
+      '<div class="crow"><div class="nm"><b>' + esc(i.name) + "</b>" + (i.notes ? "<small>" + esc(i.notes) + "</small>" : "") + "</div><span>" + i.quantity + " × " + esc(money(i.unit_price, d.currency)) + "</span></div>").join("");
+    $("stTotV").textContent = money(d.total, d.currency);
+    if (d.currency) state.currency = d.currency;
+  }
+  $("stRef").textContent = state.orderToken ? "#" + state.orderToken.slice(0, 6).toUpperCase() : "";
+  $("stTotL").textContent = t.total;
+  $("stNew").textContent = t.newOrder;
+  $("stNote").textContent = t.stNote;
+}
+$("stNew").addEventListener("click", () => {
+  state.orderToken = ""; persist();
+  stopPolling(); showMenu();
+});
+function startPolling() {
+  stopPolling();
+  const tick = async () => {
+    if (!state.orderToken) return;
+    try {
+      const { data, error } = await sb.rpc("get_qr_order_status", { p_order_token: state.orderToken });
+      if (!error && data && data.ok) renderStatus(data);
+    } catch (e) { /* إعادة المحاولة في الدورة التالية */ }
+  };
+  tick();
+  state.poll = setInterval(tick, 10000); // polling خفيف كل 10 ثوانٍ
+}
+function stopPolling() { if (state.poll) { clearInterval(state.poll); state.poll = null; } }
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopPolling(); else if (state.orderToken) startPolling(); });
+
+init();
+</script>
+</body>
+</html>
