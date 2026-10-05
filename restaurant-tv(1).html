@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#000000" />
+<title>شاشة الطلبات</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --bg:#000; --card:#111827; --line:#1f2937; --txt:#f9fafb; --muted:#9ca3af;
+          --new:#f59e0b; --prep:#38bdf8; --ready:#34d399; --danger:#f87171; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--txt);
+               font-family:"Segoe UI", Tahoma, Arial, sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:14px 22px; border-bottom:2px solid var(--line); }
+  header .logo { font-size:34px; }
+  header h1 { font-size:clamp(20px, 2.6vw, 34px); font-weight:800; }
+  header .sub { color:var(--muted); font-size:clamp(13px, 1.4vw, 18px); }
+  header .spacer { flex:1; }
+  .live { display:flex; align-items:center; gap:8px; font-size:clamp(12px,1.2vw,16px); color:var(--muted); }
+  .live i { width:12px; height:12px; border-radius:50%; background:var(--ready); display:inline-block; }
+  .live.off i { background:var(--danger); animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.25; } }
+  .hbtn { background:var(--card); border:1px solid var(--line); color:var(--txt); border-radius:10px;
+          padding:8px 14px; font-size:clamp(12px,1.2vw,16px); cursor:pointer; }
+  main { height:calc(100% - 76px); display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; padding:14px 18px; }
+  @media (max-width:700px) { main { grid-template-columns:1fr; overflow-y:auto; } }
+  .col { background:#0b0f16; border:1px solid var(--line); border-radius:16px; padding:12px; overflow-y:auto; }
+  .col h2 { text-align:center; font-size:clamp(18px,2.2vw,28px); padding:8px; border-radius:10px; margin-bottom:10px; position:sticky; top:0; }
+  .col h2 small { font-size:.7em; opacity:.8; }
+  .col.c-new h2 { background:rgba(245,158,11,.15); color:var(--new); }
+  .col.c-prep h2 { background:rgba(56,189,248,.15); color:var(--prep); }
+  .col.c-ready h2 { background:rgba(52,211,153,.15); color:var(--ready); }
+  .card { background:var(--card); border:2px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px;
+          transition:opacity .5s, transform .5s; }
+  .card.c-new { border-color:var(--new); }
+  .card.c-prep { border-color:var(--prep); }
+  .card.c-ready { border-color:var(--ready); }
+  .card.flash { animation:flash 1.2s ease-in-out 3; }
+  @keyframes flash { 0%,100% { box-shadow:0 0 0 rgba(245,158,11,0); } 50% { box-shadow:0 0 34px rgba(245,158,11,.8); } }
+  .card.leaving { opacity:.35; transform:scale(.96); }
+  .ref { font-size:clamp(20px,2.4vw,32px); font-weight:900; letter-spacing:1px; }
+  .tbl { font-size:clamp(28px,3.6vw,48px); font-weight:900; color:var(--ready); margin:4px 0 10px; }
+  .items { list-style:none; }
+  .items li { font-size:clamp(17px,2vw,26px); padding:5px 0; border-bottom:1px dashed var(--line); display:flex; gap:10px; align-items:baseline; }
+  .items li:last-child { border-bottom:0; }
+  .items .q { color:var(--new); font-weight:900; min-width:52px; }
+  .items .ni { background:var(--new); color:#451a03; font-size:.55em; font-weight:800; border-radius:8px; padding:2px 8px; vertical-align:middle; }
+  .items small { color:var(--muted); font-size:.72em; display:block; }
+  .badge { margin-top:10px; text-align:center; font-size:clamp(15px,1.8vw,24px); font-weight:800; border-radius:10px; padding:8px; }
+  .b-new { background:rgba(245,158,11,.18); color:var(--new); }
+  .b-conf { background:rgba(148,163,184,.18); color:#cbd5e1; }
+  .b-prep { background:rgba(56,189,248,.18); color:var(--prep); }
+  .b-ready { background:rgba(52,211,153,.2); color:var(--ready); }
+  .b-done { background:rgba(52,211,153,.3); color:var(--ready); }
+  .b-canc { background:rgba(248,113,113,.2); color:var(--danger); }
+  #idle { position:fixed; inset:76px 0 0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; }
+  #idle .big { font-size:96px; }
+  #idle h2 { font-size:clamp(24px,3.4vw,44px); }
+  #idle p { color:var(--muted); font-size:clamp(16px,2vw,26px); }
+  #fatal { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:20px; }
+  #fatal .big { font-size:72px; }
+  #fatal p { color:var(--muted); font-size:clamp(16px,2vw,24px); }
+  .langs { display:flex; gap:6px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">🍽️</span>
+  <div>
+    <h1 id="hName">…</h1>
+    <div class="sub" id="hSub">…</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="langs">
+    <button type="button" class="hbtn" data-lang="ar">ع</button>
+    <button type="button" class="hbtn" data-lang="fr">FR</button>
+    <button type="button" class="hbtn" data-lang="en">EN</button>
+  </div>
+  <button type="button" class="hbtn" id="muteBtn">🔊</button>
+  <button type="button" class="hbtn" id="fsBtn">⛶</button>
+  <span class="live" id="live"><i></i><span id="liveTxt">LIVE</span></span>
+</header>
+
+<main>
+  <div class="col c-new"><h2 id="cNew">🆕 جديد <small id="nNew"></small></h2><div id="lNew"></div></div>
+  <div class="col c-prep"><h2 id="cPrep">👨‍🍳 قيد التحضير <small id="nPrep"></small></h2><div id="lPrep"></div></div>
+  <div class="col c-ready"><h2 id="cReady">✅ جاهز <small id="nReady"></small></h2><div id="lReady"></div></div>
+</main>
+
+<div id="idle"><span class="big">🍽️</span><h2 id="idleT"></h2><p id="idleP"></p></div>
+<div id="fatal"><span class="big">⚠️</span><p id="fatalP"></p></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   شاشة عرض TV — Phase 8 — عرض فقط:
+   رقم الطلب + الطاولة + الأصناف + الكميات + الحالة.
+   لا أسعار/إجماليات/دفع/بيانات زبائن — الخادم لا يرسلها أصلًا.
+   anon key فقط عبر RPC آمن. polling كل 8 ثوانٍ مع إعادة اتصال تلقائية.
+   ===================================================================== */
+const SUPABASE_URL = "https://lcijdjihkzenabhnlhxl.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_1k9usfmeGl3-n1amoH9eIw_zT01B00r";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+const I18N = {
+  ar: { dir:"rtl", orders:"طلبات المطعم", cNew:"🆕 جديد", cPrep:"👨‍🍳 قيد التحضير", cReady:"✅ جاهز",
+        st:{PLACED:"🆕 طلب جديد", CONFIRMED:"📋 تم التأكيد", PREPARING:"👨‍🍳 قيد التحضير", READY:"✅ جاهز", COMPLETED:"✓ مكتمل", CANCELLED:"✕ ملغى"},
+        table:(n)=>"الطاولة " + n, newItem:"إضافة جديدة", idleT:"لا توجد طلبات حاليًا", idleP:"ستظهر الطلبات الجديدة هنا مباشرة",
+        bad:"رمز الشاشة غير صالح أو معطّل", live:"LIVE", off:"…", done:(r)=>"✓ الطلب " + r + " مكتمل", canc:(r)=>"✕ الطلب " + r + " ملغى" },
+  fr: { dir:"ltr", orders:"Commandes du restaurant", cNew:"🆕 Nouveau", cPrep:"👨‍🍳 En préparation", cReady:"✅ Prête",
+        st:{PLACED:"🆕 Nouvelle commande", CONFIRMED:"📋 Confirmée", PREPARING:"👨‍🍳 En préparation", READY:"✅ Prête", COMPLETED:"✓ Terminée", CANCELLED:"✕ Annulée"},
+        table:(n)=>"TABLE " + n, newItem:"Nouvel article", idleT:"Aucune commande active", idleP:"Les nouvelles commandes apparaîtront ici automatiquement",
+        bad:"Jeton d'écran invalide ou désactivé", live:"LIVE", off:"…", done:(r)=>"✓ Commande " + r + " terminée", canc:(r)=>"✕ Commande " + r + " annulée" },
+  en: { dir:"ltr", orders:"Restaurant Orders", cNew:"🆕 New", cPrep:"👨‍🍳 Preparing", cReady:"✅ Ready",
+        st:{PLACED:"🆕 New Order", CONFIRMED:"📋 Confirmed", PREPARING:"👨‍🍳 Preparing", READY:"✅ Ready", COMPLETED:"✓ Completed", CANCELLED:"✕ Cancelled"},
+        table:(n)=>"TABLE " + n, newItem:"NEW ITEM", idleT:"No active orders", idleP:"New orders will appear here automatically",
+        bad:"Invalid or disabled display token", live:"LIVE", off:"…", done:(r)=>"✓ Order " + r + " completed", canc:(r)=>"✕ Order " + r + " cancelled" },
+};
+let lang = localStorage.getItem("tv_lang") || "ar";
+const T = () => I18N[lang] || I18N.ar;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+const state = { token:"", prev:{}, timers:{}, poll:null, okOnce:false };
+
+function applyLang() {
+  const t = T();
+  document.documentElement.lang = lang;
+  document.documentElement.dir = t.dir;
+  $("cNew").firstChild.textContent = t.cNew + " ";
+  $("cPrep").firstChild.textContent = t.cPrep + " ";
+  $("cReady").firstChild.textContent = t.cReady + " ";
+  $("idleT").textContent = t.idleT; $("idleP").textContent = t.idleP;
+  $("liveTxt").textContent = t.live;
+  render();
+}
+document.querySelectorAll(".langs button").forEach((b) => b.addEventListener("click", () => { lang = b.dataset.lang; localStorage.setItem("tv_lang", lang); applyLang(); }));
+
+/* ---------- صوت اختياري ---------- */
+$("muteBtn").addEventListener("click", () => {
+  const m = localStorage.getItem("tv_mute") === "1";
+  localStorage.setItem("tv_mute", m ? "0" : "1");
+  $("muteBtn").textContent = m ? "🔊" : "🔇";
+});
+$("muteBtn").textContent = localStorage.getItem("tv_mute") === "1" ? "🔇" : "🔊";
+function beep() {
+  try {
+    if (localStorage.getItem("tv_mute") === "1") return;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const ctx = beep._c || (beep._c = new AC());
+    if (ctx.state === "suspended") { ctx.resume().catch(() => {}); return; }
+    const t0 = ctx.currentTime;
+    [880, 1320].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f; o.type = "sine";
+      g.gain.setValueAtTime(0.0001, t0 + i * .12);
+      g.gain.exponentialRampToValueAtTime(.1, t0 + i * .12 + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, t0 + i * .12 + .11);
+      o.connect(g).connect(ctx.destination); o.start(t0 + i * .12); o.stop(t0 + i * .12 + .12);
+    });
+  } catch (e) { /* بصري دائمًا حتى بدون صوت */ }
+}
+
+/* ---------- ملء الشاشة (بتفاعل المستخدم فقط) ---------- */
+$("fsBtn").addEventListener("click", () => {
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  } catch (e) { /* تعمل الصفحة بدون ملء الشاشة */ }
+});
+
+/* ---------- البيانات ---------- */
+const colOf = (st) => st === "PREPARING" ? "prep" : st === "READY" ? "ready" : "new"; // PLACED/CONFIRMED → جديد
+let ORDERS = []; // آخر لقطة
+
+async function tick() {
+  try {
+    const { data, error } = await sb.rpc("get_tv_orders", { p_token: state.token });
+    if (error) throw error;
+    if (!data || !data.ok) {
+      if (data && data.error === "invalid_token") return fatal(T().bad);
+      throw new Error("bad");
+    }
+    setLive(true);
+    ORDERS = data.orders || [];
+    state.okOnce = true;
+    render();
+  } catch (e) {
+    setLive(false); // مؤشر صغير فقط — لا أخطاء تقنية على الشاشة
+  }
+}
+function setLive(on) {
+  $("live").classList.toggle("off", !on);
+  $("liveTxt").textContent = on ? T().live : T().off;
+}
+function fatal(msg) {
+  stopPoll();
+  $("fatal").style.display = "flex"; $("fatalP").textContent = msg;
+  document.querySelector("main").style.display = "none"; $("idle").style.display = "none";
+}
+
+/* ---------- العرض ---------- */
+function cardHtml(o, isNew, newItems) {
+  const t = T();
+  const bcls = { PLACED:"b-new", CONFIRMED:"b-conf", PREPARING:"b-prep", READY:"b-ready", COMPLETED:"b-done", CANCELLED:"b-canc" }[o.status] || "b-new";
+  const items = (o.items || []).map((i) =>
+    "<li><span class='q'>" + i.quantity + " ×</span><span>" + esc(i.name) +
+    (newItems.has(i.name + "|" + (i.notes || "")) ? " <span class='ni'>" + esc(t.newItem) + "</span>" : "") +
+    (i.notes ? "<small>📝 " + esc(i.notes) + "</small>" : "") + "</span></li>").join("");
+  return '<div class="card c-' + colOf(o.status) + (isNew ? " flash" : "") + '" data-ref="' + esc(o.ref) + '">' +
+    '<div class="ref">#' + esc(o.ref) + "</div>" +
+    '<div class="tbl">' + esc(t.table(o.table_number || "—")) + "</div>" +
+    '<ul class="items">' + items + "</ul>" +
+    '<div class="badge ' + bcls + '">' + esc(t.st[o.status] || o.status) + "</div></div>";
+}
+function render() {
+  const t = T();
+  const active = ORDERS.filter((o) => ["PLACED", "CONFIRMED", "PREPARING", "READY"].includes(o.status));
+  const leaving = ORDERS.filter((o) => ["COMPLETED", "CANCELLED"].includes(o.status));
+  // اكتشاف الطلبات الجديدة والعناصر الجديدة (مقارنة باللقطة السابقة)
+  const prevRefs = new Set(Object.keys(state.prev));
+  const groups = { new: [], prep: [], ready: [] };
+  active.forEach((o) => {
+    const isNew = state.okOnce && !prevRefs.has(o.ref);
+    const prevItems = new Set((state.prev[o.ref] || []).map((i) => i.name + "|" + (i.notes || "")));
+    const newItems = new Set();
+    (o.items || []).forEach((i) => { const k = i.name + "|" + (i.notes || ""); if (state.okOnce && prevRefs.has(o.ref) && !prevItems.has(k)) newItems.add(k); });
+    if (isNew) beep();
+    groups[colOf(o.status)].push(cardHtml(o, isNew, newItems));
+  });
+  leaving.forEach((o) => {
+    const g = colOf(o.status === "COMPLETED" ? "READY" : "PREPARING"); // تظهر لحظيًا في آخر عمود منطقي
+    groups[g === "new" ? "new" : g].push(cardHtml(o, false, new Set()).replace('class="card ', 'class="card leaving '));
+    // إزالة نهائية بعد الانتقال البصري (الخادم يتوقف عن إرسالها بعد 90 ثانية)
+    if (!state.timers[o.ref]) state.timers[o.ref] = setTimeout(() => { delete state.timers[o.ref]; }, 6000);
+  });
+  $("lNew").innerHTML = groups.new.join("");
+  $("lPrep").innerHTML = groups.prep.join("");
+  $("lReady").innerHTML = groups.ready.join("");
+  $("nNew").textContent = groups.new.length ? "(" + (active.filter((o) => colOf(o.status) === "new").length) + ")" : "";
+  $("nPrep").textContent = groups.prep.length ? "(" + groups.prep.length + ")" : "";
+  $("nReady").textContent = groups.ready.length ? "(" + groups.ready.length + ")" : "";
+  $("idle").style.display = active.length ? "none" : "flex";
+  document.querySelector("main").style.visibility = active.length ? "visible" : "hidden";
+  // لقطة جديدة
+  state.prev = {};
+  active.concat(leaving).forEach((o) => { state.prev[o.ref] = o.items || []; });
+}
+
+function stopPoll() { if (state.poll) { clearInterval(state.poll); state.poll = null; } }
+async function init() {
+  applyLang();
+  state.token = new URLSearchParams(location.search).get("t") || "";
+  if (!state.token) return fatal(T().bad);
+  try {
+    const { data, error } = await sb.rpc("resolve_tv_display", { p_token: state.token });
+    if (error) throw error;
+    if (!data || !data.length) return fatal(T().bad);
+    $("hName").textContent = data[0].store_name || data[0].display_name || "🍽️";
+    applyLangTitle();
+  } catch (e) { /* نحاول المتابعة — get_tv_orders سيقرر */ }
+  tick();
+  state.poll = setInterval(tick, 8000); // ≤ 10 ثوانٍ، إعادة اتصال تلقائية
+}
+function applyLangTitle() { const t = T(); $("hSub").textContent = t.orders; }
+document.addEventListener("visibilitychange", () => { if (!document.hidden && state.poll) tick(); });
+init();
+</script>
+</body>
+</html>
